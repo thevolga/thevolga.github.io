@@ -1,21 +1,108 @@
-extends base
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head><meta name="generator" content="Hexo 3.8.0">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>thevolga</title>
+  
+  
+  
+  <!--link rel="stylesheet" href="//cdn.jsdelivr.net/highlight.js/9.10.0/styles/github-gist.min.css"-->
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/highlight.js/9.10.0/styles/github-gist.min.css">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
 
-block nav
-    - var pageName = "ARCHIVES"
-    include _partial/menu
+<body>
+<div class="Shell">
+    <aside class="SideBar">
+    <section class="avatar" style="background-image: url()">
+        <div class="av-pic" style="background-image: url(/assets/p.jpg)">
+        </div>
+    </section>
+    <section class="menu">
+        <div>thevolga</div>
+        
+        <ul>
+          
+            <a href="/" class="Btn">
+              <li>Home</li>
+            </a>  
+          
+            <a href="/archives/" class="Btn">
+              <li>Archive</li>
+            </a>  
+          
+        </ul>
+    </section>
+    <section class="media">
+        
+    </section>
+</aside>
 
-block header
-    - var tag = __("site_tags");
-    - var pageHeader = tag + " : " + page.tag
-    include _partial/body_header
+    <div class="container">
+        <div data-pager-shell>
+            <div class="Archives">
+  
+  
+  
+    
+    <section class="TimeSection">
+    <h1 class="time-section-year">
+        2019
+    </h1>
+    <ul class="time-section-list">
+      
+      
+        <li>
+            <a href="/2019/02/06/《流浪地球》观后感/">
+                <h2>《流浪地球》观后感</h2>
+            </a>
+            <div class="ListMeta">
+  <time datetime="2019-02-06T12:02:41.000Z" itemprop="datePublished">
+    2019-02-06
+  </time>
+  
+  | 
+  <ul>
+    
+  <li class="meta-text">
+  { <a href="/tags/电影/">电影</a> }
+  </li>
 
-block content
-    div.body__content.archive__content
-        each post in page.posts.toArray()
-            a(href=url_for(post.path), title=post.title).body__item.post__title
-                span!= post.title
-                - var d = new Date(post.date)
-                - var dstr = d.getFullYear() + "/" + (d.getMonth()+1) + "/" + d.getDate()
-                span(class="archive_date")!= dstr
-    div.body__pagination
-        div.pull-right!= paginator()
+
+  </ul>
+  
+  
+</div>
+
+        </li>
+      
+    </ul>
+</section>
+
+  
+</div>
+            <footer>
+    <div>© 2019 - thevolga </div>
+    <div>
+        <span>
+            Powered by <a href="https://hexo.io">Hexo</a>
+        </span>
+        ,
+        <span>
+            Theme - <a href="https://github.com/nameoverflow/hexo-theme-icalm">Icalm</a>
+        </span>
+    </div>
+</footer>
+
+        </div>
+    </div>
+</div>
+<script src="/js/pager/dist/singlepager.js"></script>
+<script>
+var sp = new Pager('data-pager-shell')
+
+</script>
+</body>
+</html>
