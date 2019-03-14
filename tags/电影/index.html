@@ -1,118 +1,21 @@
-<!DOCTYPE html>
-<html lang="zh-cmn-Hans">
-<head><meta name="generator" content="Hexo 3.8.0">
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>thevolga</title>
-  
-  
-  
-  <!--link rel="stylesheet" href="//cdn.jsdelivr.net/highlight.js/9.10.0/styles/github-gist.min.css"-->
-  <link rel="stylesheet" href="//cdn.jsdelivr.net/highlight.js/9.10.0/styles/github-gist.min.css">
-  <link rel="stylesheet" href="/css/style.css">
-</head>
+extends base
 
-<body>
-<div class="Shell">
-    <aside class="SideBar">
-    <section class="avatar" style="background-image: url()">
-        <div class="av-pic" style="background-image: url(/assets/p.jpg)">
-        </div>
-    </section>
-    <section class="menu">
-        <div>thevolga</div>
-        
-        <ul>
-          
-            <a href="/" class="Btn">
-              <li>Home</li>
-            </a>  
-          
-            <a href="/archives/" class="Btn">
-              <li>Archive</li>
-            </a>  
-          
-        </ul>
-    </section>
-    <section class="media">
-        
-    </section>
-</aside>
+block nav
+    - var pageName = "ARCHIVES"
+    include _partial/menu
 
-    <div class="container">
-        <div data-pager-shell>
-            <ul class="Index">
-  
-    <header class="PageTitle">
-        <h1>{ 电影 }</h1>
-    </header>
-  
-  
-    <li>
-      <article class="ListView">
-    <header class="title">
-      
-        <h1>
-          <a href="/2019/02/06/《流浪地球》观后感/">《流浪地球》观后感</a>
-        </h1>
-      
-      <div class="ListMeta">
-  <time datetime="2019-02-06T12:02:41.000Z" itemprop="datePublished">
-    2019-02-06
-  </time>
-  
-  | 
-  <ul>
-    
-  <li class="meta-text">
-  { <a href="/tags/电影/">电影</a> }
-  </li>
+block header
+    - var tag = __("site_tags");
+    - var pageHeader = tag + " : " + page.tag
+    include _partial/body_header
 
-
-  </ul>
-  
-  
-</div>
-
-    </header>
-    <div>
-      
-        <p>这部电影证明我国电影特效技术早都到位了 只是一直没遇到好作品</p>
-<p>几十年后 严酷的地上环境 人类为了生存躲进避难所 辐射里称为shelter 这里称为地下城 说实话爷爷抱着孙子进入避难所的这幕过场给我留下了很深的印象 简直和辐射4开场时一模一样 而教室外阳光明媚的虚拟布景又让我想起海伯利安的模拟刺激接入 总而言之就是要素过多 而又恰到好处</p>
-<p>我总觉得悲伤和壮烈 这两点中的任何一点 被单独提及时都无法震撼人心 只有当它们以悲壮出现时才是最优解：“虽千万人 吾往矣” 我想不论何时 科幻这一题材终究是载体 它的内核仍是要落到人类的情感之上 所以我才会在看到刘启一人抬头仰望巨大奇异的木星时眼眶湿润 被迫与不可控的宇宙星体相对抗 像极了温伯特教授带着逆时间而行的瑞秋回到海伯利安寻找答案 他们都面临着不可知的命运 企图以一己之力扭转早已落幕的结局 这是悲伤 而当刘启在绝望的气氛中寻找解答与出口 当温伯特跪倒在浑身布满荆棘的伯劳面前时 他们确实发出了有力的声音 为了抓住仅存的微光 这是壮烈</p>
-<p>科学仍然很迷人 它为你描绘出无限大的蓝图 又伴随着深不可测的冷酷与温情 无法预测 无法改变 也无法与之抗衡 </p>
-
-      
-    </div>
-</article>
-
-    </li>
-  
-</ul>
-
-
-
-            <footer>
-    <div>© 2019 - thevolga </div>
-    <div>
-        <span>
-            Powered by <a href="https://hexo.io">Hexo</a>
-        </span>
-        ,
-        <span>
-            Theme - <a href="https://github.com/nameoverflow/hexo-theme-icalm">Icalm</a>
-        </span>
-    </div>
-</footer>
-
-        </div>
-    </div>
-</div>
-<script src="/js/pager/dist/singlepager.js"></script>
-<script>
-var sp = new Pager('data-pager-shell')
-
-</script>
-</body>
-</html>
+block content
+    div.body__content.archive__content
+        each post in page.posts.toArray()
+            a(href=url_for(post.path), title=post.title).body__item.post__title
+                span!= post.title
+                - var d = new Date(post.date)
+                - var dstr = d.getFullYear() + "/" + (d.getMonth()+1) + "/" + d.getDate()
+                span(class="archive_date")!= dstr
+    div.body__pagination
+        div.pull-right!= paginator()
