@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>Tags /标签 | theVolga&#39;s Blog</title>
+  <title>RESTful程序中有关curl命令的小问题及解决 | theVolga&#39;s Blog</title>
   
   
   
@@ -73,68 +73,55 @@
             <div>
   <article class="ContentView">
     <header class="PageTitle">
-        <h1>Tags /标签</h1>
+        <h1>RESTful程序中有关curl命令的小问题及解决</h1>
     </header>
 
     <section>
-      
-
-      
-        <ul class="Tags">
-          
-  <li class="tag-list">
-  { <a href="/tags/flask/">flask</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/RESTful/">RESTful</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/我的英雄学院/">我的英雄学院</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/爆豪胜己/">爆豪胜己</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/白夜行/">白夜行</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/电影/">电影</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/流浪地球/">流浪地球</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/科幻/">科幻</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/海伯利安/">海伯利安</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/茶花女/">茶花女</a> }
-  </li>
-
-  <li class="tag-list">
-  { <a href="/tags/荆棘鸟/">荆棘鸟</a> }
-  </li>
+      <p>今天下午在看这篇介绍RESTful文章（链接：<a href="https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask）的时候，有一处牵扯到curl命令windows与linux系统的不同，和双引号有关。" target="_blank" rel="noopener">https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask）的时候，有一处牵扯到curl命令windows与linux系统的不同，和双引号有关。</a></p>
+<p>原文中作者说windows的cmd中若双引号内套双引号，需要改为用三引号。</p>
+<blockquote>
+<p>Note: if you are on Windows and use the Cygwin version of <code>curl</code> from <code>bash</code> then the above command will work just fine. However, if you are using the native version of <code>curl</code> from the regular command prompt there is a little dance that needs to be done to send double quotes inside the body of a request:</p>
+</blockquote>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -i -H &quot;Content-Type: application/json&quot; -X POST -d &quot;&#123;&quot;&quot;&quot;title&quot;&quot;&quot;:&quot;&quot;&quot;Read a book&quot;&quot;&quot;&#125;&quot; http://localhost:5000/todo/api/v1.0/tasks</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>Essentially on Windows you have to use double quotes to enclose the body of the request, and then inside it you escape a double quote by writing three of them in sequence.</p>
+</blockquote>
+<p>但是在实际操作时会报错。最后查了StackOverflow上的解决方法，将内部的三引号改为转义符加一个引号即可，即将上述命令改为：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -i -H &quot;Content-Type: application/json&quot; -X POST -d &quot;&#123;&quot;&quot;&quot;title&quot;&quot;&quot;:&quot;&quot;&quot;Read a book&quot;&quot;&quot;&#125;&quot; http://localhost:5000/todo/api/v1.0/tasks</span><br></pre></td></tr></table></figure>
+<p>虽然标点符号说起来只是一个小问题，不过0和1的世界就是这样，一个小地方出差错都不行，总之今后希望自己能多注意这些细节。</p>
 
 
-        </ul>
       
 
     </section>
     
+      <section class="ArticleMeta">
+          <div>
+            发布于&nbsp;
+            <time datetime="2019-03-16T16:23:05.000Z" itemprop="datePublished">
+              2019-03-17
+            </time>
+          </div>
+          
+            <div>
+              tags: 
+  <li class="meta-text">
+  { <a href="/tags/flask/">flask</a> }
+  </li>
+
+  <li class="meta-text">
+  { <a href="/tags/RESTful/">RESTful</a> }
+  </li>
+
+
+            </div>
+          
+      </section>
+    
     
 </article>
 
+  
 </div>
 
             <footer>
