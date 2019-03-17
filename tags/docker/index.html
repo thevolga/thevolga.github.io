@@ -73,7 +73,7 @@
             <ul class="Index">
   
     <header class="PageTitle">
-        <h1>{ flask }</h1>
+        <h1>{ docker }</h1>
     </header>
   
   
@@ -82,11 +82,11 @@
     <header class="title">
       
         <h1>
-          <a href="/2019/03/17/RESTful程序中有关curl命令的小问题及解决/">RESTful程序中有关curl命令的小问题及解决</a>
+          <a href="/2019/03/17/通过docker容器使用Cassandra分析工具的流程记录/">通过docker容器使用Cassandra分析工具的流程记录</a>
         </h1>
       
       <div class="ListMeta">
-  <time datetime="2019-03-16T16:23:05.000Z" itemprop="datePublished">
+  <time datetime="2019-03-17T07:52:13.000Z" itemprop="datePublished">
     2019-03-17
   </time>
   
@@ -94,11 +94,7 @@
   <ul>
     
   <li class="meta-text">
-  { <a href="/tags/flask/">flask</a> }
-  </li>
-
-  <li class="meta-text">
-  { <a href="/tags/RESTful/">RESTful</a> }
+  { <a href="/tags/docker/">docker</a> }
   </li>
 
 
@@ -120,18 +116,24 @@
     </header>
     <div>
       
-        <p>今天下午在看这篇介绍RESTful文章（链接：<a href="https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask）的时候，有一处牵扯到curl命令windows与linux系统的不同，和双引号有关。" target="_blank" rel="noopener">https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask）的时候，有一处牵扯到curl命令windows与linux系统的不同，和双引号有关。</a></p>
-<p>原文中作者说windows的cmd中若双引号内套双引号，需要改为用三引号。</p>
+        <p>这段时间又接触了很多新的软件和工具，主要体会就是Windows系统和Unix内核的系统比起来真的是有先天性缺陷的，我真的现在就想拥有一个macOS。</p>
+<p>用Windows安装Cassandra也是，下载package，在一堆参数里搜索并依次修改环境变量，搞了十来分钟最后还是缺一个文件找不到。最后决定还是使用轻量级的docker来完成。这篇文章记录一下过程。</p>
 <blockquote>
-<p>Note: if you are on Windows and use the Cygwin version of <code>curl</code> from <code>bash</code> then the above command will work just fine. However, if you are using the native version of <code>curl</code> from the regular command prompt there is a little dance that needs to be done to send double quotes inside the body of a request:</p>
+<ol>
+<li>docker pull cassandra:latest //用于pull下来cassandra镜像</li>
+<li>docker run –name some-cassandra –network some-network -d cassandra:tag //此处 some-cassandra即为你创建的cassandra docker的名字 some-network即为某网络的名字 tag替换为版本 此处使用latest 此命令用于开始一个Cassandra服务器</li>
+<li>docker ps //可看到当前正在运行的docker及信息</li>
+<li>docker network create some-network //创建网络 此处使用mynetwork的名称</li>
+<li>docker start thevolga //开始运行thevolga容器 命令行返回thevolga</li>
+<li>docker run –name thevolga –network mynetwork -d cassandra:latest<br>docker: Error response from daemon: Conflict. The container name “/thevolga” is already in use by container “94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8”. You have to remove (or rename) that container to be able to reuse that name.<br>See ‘docker run –help’.</li>
+<li>docker kill 94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8<br>94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8</li>
+<li>docker rm 94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8<br>94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8</li>
+<li>docker run -it –network mynetwork –rm cassandra cqlsh thevolga<br>Connected to Test Cluster at thevolga:9042.<br>[cqlsh 5.0.1 | Cassandra 3.11.4 | CQL spec 3.4.4 | Native protocol v4]<br>Use HELP for help.<br>cqlsh&gt;</li>
+</ol>
 </blockquote>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -i -H &quot;Content-Type: application/json&quot; -X POST -d &quot;&#123;&quot;&quot;&quot;title&quot;&quot;&quot;:&quot;&quot;&quot;Read a book&quot;&quot;&quot;&#125;&quot; http://localhost:5000/todo/api/v1.0/tasks</span><br></pre></td></tr></table></figure>
-<blockquote>
-<p>Essentially on Windows you have to use double quotes to enclose the body of the request, and then inside it you escape a double quote by writing three of them in sequence.</p>
-</blockquote>
-<p>但是在实际操作时会报错。最后查了StackOverflow上的解决方法，将内部的三引号改为转义符加一个引号即可，即将上述命令改为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -i -H &quot;Content-Type: application/json&quot; -X POST -d &quot;&#123;\&quot;title\&quot;:\&quot;Read a book\&quot;&#125;&quot; http://localhost:5000/todo/api/v1.0/tasks</span><br></pre></td></tr></table></figure>
-<p>虽然标点符号说起来只是一个小问题，不过0和1的世界就是这样，一个小地方出差错都不行，总之今后希望自己能多注意这些细节。</p>
+<p>这样就可以了。中间似乎有几步是绕了弯子的，不过最后界面出来了就好。</p>
+<p>p.s. 全过程都开着小火箭，我国国情特殊你懂的。</p>
+<p>BTW这段时间不论安装什么，过程中出现的基本都是网络问题。所以最近在生气之余更加确信，您国GFW的最大功劳到底是什么？比起挡住了那些容易引起社会不稳定的信息，更严重的后果是阻断了可能提高国内人群知识技能的手段。聪明如他不可能不懂这点吧，到底是蠢还是坏，真的很难说。</p>
 
       
     </div>

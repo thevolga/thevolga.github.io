@@ -130,7 +130,7 @@
 <p>Essentially on Windows you have to use double quotes to enclose the body of the request, and then inside it you escape a double quote by writing three of them in sequence.</p>
 </blockquote>
 <p>但是在实际操作时会报错。最后查了StackOverflow上的解决方法，将内部的三引号改为转义符加一个引号即可，即将上述命令改为：</p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -i -H &quot;Content-Type: application/json&quot; -X POST -d &quot;&#123;&quot;&quot;&quot;title&quot;&quot;&quot;:&quot;&quot;&quot;Read a book&quot;&quot;&quot;&#125;&quot; http://localhost:5000/todo/api/v1.0/tasks</span><br></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -i -H &quot;Content-Type: application/json&quot; -X POST -d &quot;&#123;\&quot;title\&quot;:\&quot;Read a book\&quot;&#125;&quot; http://localhost:5000/todo/api/v1.0/tasks</span><br></pre></td></tr></table></figure>
 <p>虽然标点符号说起来只是一个小问题，不过0和1的世界就是这样，一个小地方出差错都不行，总之今后希望自己能多注意这些细节。</p>
 
       
