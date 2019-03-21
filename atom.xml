@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>theVolga&#39;s Blog</title>
+  
+  <subtitle>Mawkish.</subtitle>
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="http://yoursite.com/"/>
+  <updated>2019-03-21T15:44:19.349Z</updated>
+  <id>http://yoursite.com/</id>
+  
+  <author>
+    <name>thevolga</name>
+    
+  </author>
+  
+  <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>关于在Cassandra中使用cqlsh的一晚上折腾记录</title>
+    <link href="http://yoursite.com/2019/03/21/%E5%85%B3%E4%BA%8E%E5%9C%A8Cassandra%E4%B8%AD%E4%BD%BF%E7%94%A8cqlsh%E7%9A%84%E4%B8%80%E6%99%9A%E4%B8%8A%E6%8A%98%E8%85%BE%E8%AE%B0%E5%BD%95/"/>
+    <id>http://yoursite.com/2019/03/21/关于在Cassandra中使用cqlsh的一晚上折腾记录/</id>
+    <published>2019-03-21T15:42:19.000Z</published>
+    <updated>2019-03-21T15:44:19.349Z</updated>
+    
+    <content type="html"><![CDATA[<p>虽然这周六要考GRE，但是该做的还是得做，该学的还是得学。今天是Cassandra+cqlsh的学习记录。</p><h4 id="CQL特性"><a href="#CQL特性" class="headerlink" title="CQL特性"></a>CQL特性</h4><p>No arbitrary WHERE clause</p><p>No JOINS</p><p>No arbitrary GROUP BY</p><p>No arbitrary ORDER BY clauses</p><h4 id="创建-create"><a href="#创建-create" class="headerlink" title="创建 create"></a>创建 create</h4><p>创建名为animals的keyspace后，可以用desc keyspaces查看。</p><p>之后创建monkeys的表。</p><blockquote><p>CREATE TABLE monkeys (  </p><p>​    type text,  </p><p>​    family text,  </p><p>​    common_name text,  </p><p>​    conservation_status text,  </p><p>​    avg_size_in_grams int,  </p><p>​    PRIMARY KEY ((type, family), common_name));</p><p>);</p></blockquote><p>注意此处的primary key。此处为一个复合键。前一个(type, family)为partition key，后一个common_name为cluster key。</p><h4 id="composite-partition-key"><a href="#composite-partition-key" class="headerlink" title="composite partition key"></a>composite partition key</h4><p>由多列组成，在cluster columns之前由一组额外的括号定义。</p><p>既然cluster key决定了数据在一行中存储的顺序 那么partition key就帮助将数据分散在cluster中。</p><p>设计表时，可将partition key视为将数据平均地传播到cluster中的工具。可将cluster key视为决定一个partition中数据顺序的事物。</p><p>*cluster key是可选的。</p><h4 id="插入-insert"><a href="#插入-insert" class="headerlink" title="插入 insert"></a>插入 insert</h4><p>当插入数据时，主键是必需的（mandatory）。</p><p>命令语句同MySQL数据库。</p><p>之后用select语句查看数据，红色属性为partition key，蓝绿色（cyan）属性为cluster key。</p><h4 id="一致性等级-consistency-level"><a href="#一致性等级-consistency-level" class="headerlink" title="一致性等级 consistency level"></a>一致性等级 consistency level</h4><p>此属性可以配置。 </p><p>Cassandra作为NoSQL数据库在CAP原理上选择了AP，即availability和partition tolerance（未选择C which means consistency）。</p><p>输入 consistency cql中出现表述：</p><blockquote><p>cqlsh:animals&gt; consistency<br>Current consistency level is ONE.</p></blockquote><p>解释：一致性等级为1，表示只要一个node成功插入了这个statement，则认为插入成功。在每一个节点上，该insert statement首先被写入commit log，之后再被插入memtable（如一个write back cache）。这个memtable会被周期性或是在达到某个</p><p>bu’guo阈值时被冲入disk中。这个flushing的过程将memtable/cache转化为一个SSTable。</p><h4 id="节点工具-flush"><a href="#节点工具-flush" class="headerlink" title="节点工具 flush"></a>节点工具 flush</h4><p>手动将animals flush进入disk以创建SSTable</p><blockquote><p>nodetool flush animals</p></blockquote><p>之后可在docker根文件夹找到SSTable</p><p>本步骤失败。今晚一直在解决docker内安装cassandra之后找不到json文件目录的问题。</p><p>然后现在在apple官网看mac的售价。</p><p><strong>2h后：</strong></p><p>纠结了几个小时，内网外网相关网站都看完了。最终决定先忽略了这一步，安装了Cassandra-driver之后，运行了如下程序，算是初步把数据库和python程序接上头了，还可以吧。</p><p>之前先rm原来的容器，重新执行下列有端口的命令：</p><blockquote><p>docker run –name thevolga -p 9042:9042 -d cassandra:latest</p></blockquote><p>之后执行docker ps可以看到目前正在运行的docker:</p><blockquote><p>C:\WINDOWS\system32&gt;docker ps<br>CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                                                       NAMES<br>1ec3049bc07f        cassandra:latest    “docker-entrypoint.s…”   6 minutes ago       Up 6 minutes        7000-7001/tcp, 7199/tcp, 9160/tcp, <strong>0.0.0.0:9042-&gt;9042/tcp</strong>   thevolga</p></blockquote><p>黑体部分说明有了端口映射。</p><p>之后运行如下python程序即可，注意indent。</p><blockquote><p>import logging</p><p>log = logging.getLogger()</p><p>log.setLevel(‘INFO’)</p><p>handler = logging.StreamHandler()</p><p>handler.setFormatter(logging.Formatter(“%(asctime)s [%(levelname)s] %(name)s: %(message)s”))</p><p>log.addHandler(handler)</p><p>from cassandra.cluster import Cluster</p><p>from cassandra import ConsistencyLevel</p><p># from cassandra.cluster import Cluster</p><p># from cassandra.query import SimpleStatement</p><p>KEYSPACE = “mykeyspace”</p><p>def createKeySpace():</p><p>   cluster = Cluster(contact_points=[‘127.0.0.1’],port=9042)</p><p>   session = cluster.connect()</p><p>   log.info(“Creating keyspace…”)</p><p>   try:</p><p>​       session.execute(“””</p><p>​           CREATE KEYSPACE %s</p><p>​           WITH replication = { ‘class’: ‘SimpleStrategy’, ‘replication_factor’: ‘2’ }</p><p>​           “”” % KEYSPACE)</p><p>​       log.info(“setting keyspace…”)</p><p>​       session.set_keyspace(KEYSPACE)</p><p>​       log.info(“creating table…”)</p><p>​       session.execute(“””</p><p>​           CREATE TABLE mytable (</p><p>​               mykey text,</p><p>​               col1 text,</p><p>​               col2 text,</p><p>​               PRIMARY KEY (mykey, col1)</p><p>​           )</p><p>​           “””)</p><p>   except Exception as e:</p><p>​       log.error(“Unable to create keyspace”)</p><p>​       log.error(e)</p><p>createKeySpace();</p></blockquote><p>初次运行本段代码后，控制台输入以下信息 which implys 连接成功。</p><blockquote><p>(base) G:\flasklab&gt;cd g:\flasklab &amp;&amp; cmd /C “set “PYTHONIOENCODING=UTF-8” &amp;&amp; set “PYTHONUNBUFFERED=1” &amp;&amp; G:\Anaconda3\python.exe c:\Users\lenovo.vscode\extensions\ms-python.python-2019.1.0\pythonFiles\ptvsd_launcher.py –default –client –host localhost –port 54305 g:\flasklab\test.py “<br>2019-03-21 23:30:05,235 [WARNING] cassandra.cluster: Cluster.<strong>init</strong> called with contact_points specified, but no load_balancing_policy. In the next major version, this will raise an error; please specify a load-balancing policy. (contact_points = [‘127.0.0.1’], lbp = None)<br>2019-03-21 23:30:06,963 [INFO] cassandra.policies: Using datacenter ‘datacenter1’ for DCAwareRoundRobinPolicy (via host ‘127.0.0.1’); if incorrect, please specify a local_dc to the constructor, or limit contact points to local cluster nodes<br>2019-03-21 23:30:07,283 [INFO] root: Creating keyspace…<br>2019-03-21 23:30:08,710 [INFO] root: setting keyspace…<br>2019-03-21 23:30:08,848 [INFO] root: creating table…</p></blockquote><p>今天就到这里吧，毕竟快要考试了，而我甚至现在还想给blog加一个RSS订阅的接口。你可当个人吧。</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;虽然这周六要考GRE，但是该做的还是得做，该学的还是得学。今天是Cassandra+cqlsh的学习记录。&lt;/p&gt;
+&lt;h4 id=&quot;CQL特性&quot;&gt;&lt;a href=&quot;#CQL特性&quot; class=&quot;headerlink&quot; title=&quot;CQL特性&quot;&gt;&lt;/a&gt;CQL特性&lt;/h4&gt;
+      
+    
+    </summary>
+    
+      <category term="技术" scheme="http://yoursite.com/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+      <category term="docker" scheme="http://yoursite.com/tags/docker/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>通过docker容器使用Cassandra分析工具的流程记录</title>
+    <link href="http://yoursite.com/2019/03/17/%E9%80%9A%E8%BF%87docker%E5%AE%B9%E5%99%A8%E4%BD%BF%E7%94%A8Cassandra%E5%88%86%E6%9E%90%E5%B7%A5%E5%85%B7%E7%9A%84%E6%B5%81%E7%A8%8B%E8%AE%B0%E5%BD%95/"/>
+    <id>http://yoursite.com/2019/03/17/通过docker容器使用Cassandra分析工具的流程记录/</id>
+    <published>2019-03-17T07:52:13.000Z</published>
+    <updated>2019-03-17T09:00:09.586Z</updated>
+    
+    <content type="html"><![CDATA[<p>这段时间又接触了很多新的软件和工具，主要体会就是Windows系统和Unix内核的系统比起来真的是有先天性缺陷的，我真的现在就想拥有一个macOS。</p><p>用Windows安装Cassandra也是，下载package，在一堆参数里搜索并依次修改环境变量，搞了十来分钟最后还是缺一个文件找不到。最后决定还是使用轻量级的docker来完成。这篇文章记录一下过程。</p><blockquote><ol><li>docker pull cassandra:latest //用于pull下来cassandra镜像</li><li>docker run –name some-cassandra –network some-network -d cassandra:tag //此处 some-cassandra即为你创建的cassandra docker的名字 some-network即为某网络的名字 tag替换为版本 此处使用latest 此命令用于开始一个Cassandra服务器</li><li>docker ps //可看到当前正在运行的docker及信息</li><li>docker network create some-network //创建网络 此处使用mynetwork的名称</li><li>docker start thevolga //开始运行thevolga容器 命令行返回thevolga</li><li>docker run –name thevolga –network mynetwork -d cassandra:latest<br>docker: Error response from daemon: Conflict. The container name “/thevolga” is already in use by container “94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8”. You have to remove (or rename) that container to be able to reuse that name.<br>See ‘docker run –help’.</li><li>docker kill 94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8<br>94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8</li><li>docker rm 94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8<br>94bfc975c83da15c650a15db266ffcf1223ebfc915301706b8929c7919d6b4c8</li><li>docker run -it –network mynetwork –rm cassandra cqlsh thevolga<br>Connected to Test Cluster at thevolga:9042.<br>[cqlsh 5.0.1 | Cassandra 3.11.4 | CQL spec 3.4.4 | Native protocol v4]<br>Use HELP for help.<br>cqlsh&gt;</li></ol></blockquote><p>这样就可以了。中间似乎有几步是绕了弯子的，不过最后界面出来了就好。</p><p>p.s. 全过程都开着小火箭，我国国情特殊你懂的。</p><p>BTW这段时间不论安装什么，过程中出现的基本都是网络问题。所以最近在生气之余更加确信，您国GFW的最大功劳到底是什么？比起挡住了那些容易引起社会不稳定的信息，更严重的后果是阻断了可能提高国内人群知识技能的手段。聪明如他不可能不懂这点吧，到底是蠢还是坏，真的很难说。</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;这段时间又接触了很多新的软件和工具，主要体会就是Windows系统和Unix内核的系统比起来真的是有先天性缺陷的，我真的现在就想拥有一个macOS。&lt;/p&gt;
+&lt;p&gt;用Windows安装Cassandra也是，下载package，在一堆参数里搜索并依次修改环境变量，搞了十来分
+      
+    
+    </summary>
+    
+      <category term="技术" scheme="http://yoursite.com/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+      <category term="docker" scheme="http://yoursite.com/tags/docker/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>RESTful程序中有关curl命令的小问题及解决</title>
+    <link href="http://yoursite.com/2019/03/17/RESTful%E7%A8%8B%E5%BA%8F%E4%B8%AD%E6%9C%89%E5%85%B3curl%E5%91%BD%E4%BB%A4%E7%9A%84%E5%B0%8F%E9%97%AE%E9%A2%98%E5%8F%8A%E8%A7%A3%E5%86%B3/"/>
+    <id>http://yoursite.com/2019/03/17/RESTful程序中有关curl命令的小问题及解决/</id>
+    <published>2019-03-16T16:23:05.000Z</published>
+    <updated>2019-03-17T09:00:38.405Z</updated>
+    
+    <content type="html"><![CDATA[<p>今天下午在看这篇介绍RESTful文章（链接：<a href="https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask）的时候，有一处牵扯到curl命令windows与linux系统的不同，和双引号有关。" target="_blank" rel="noopener">https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask）的时候，有一处牵扯到curl命令windows与linux系统的不同，和双引号有关。</a></p><p>原文中作者说windows的cmd中若双引号内套双引号，需要改为用三引号。</p><blockquote><p>Note: if you are on Windows and use the Cygwin version of <code>curl</code> from <code>bash</code> then the above command will work just fine. However, if you are using the native version of <code>curl</code> from the regular command prompt there is a little dance that needs to be done to send double quotes inside the body of a request:</p></blockquote><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -i -H &quot;Content-Type: application/json&quot; -X POST -d &quot;&#123;&quot;&quot;&quot;title&quot;&quot;&quot;:&quot;&quot;&quot;Read a book&quot;&quot;&quot;&#125;&quot; http://localhost:5000/todo/api/v1.0/tasks</span><br></pre></td></tr></table></figure><blockquote><p>Essentially on Windows you have to use double quotes to enclose the body of the request, and then inside it you escape a double quote by writing three of them in sequence.</p></blockquote><p>但是在实际操作时会报错。最后查了StackOverflow上的解决方法，将内部的三引号改为转义符加一个引号即可，即将上述命令改为：</p><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -i -H &quot;Content-Type: application/json&quot; -X POST -d &quot;&#123;\&quot;title\&quot;:\&quot;Read a book\&quot;&#125;&quot; http://localhost:5000/todo/api/v1.0/tasks</span><br></pre></td></tr></table></figure><p>虽然标点符号说起来只是一个小问题，不过0和1的世界就是这样，一个小地方出差错都不行，总之今后希望自己能多注意这些细节。</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;今天下午在看这篇介绍RESTful文章（链接：&lt;a href=&quot;https://blog.miguelgrinberg.com/post/designing-a-restful-api-with-python-and-flask）的时候，有一处牵扯到curl命令window
+      
+    
+    </summary>
+    
+      <category term="技术" scheme="http://yoursite.com/categories/%E6%8A%80%E6%9C%AF/"/>
+    
+    
+      <category term="flask" scheme="http://yoursite.com/tags/flask/"/>
+    
+      <category term="RESTful" scheme="http://yoursite.com/tags/RESTful/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>all胜我真的可以</title>
+    <link href="http://yoursite.com/2019/03/15/all%E7%88%86%E6%88%91%E7%9C%9F%E7%9A%84%E5%8F%AF%E4%BB%A5/"/>
+    <id>http://yoursite.com/2019/03/15/all爆我真的可以/</id>
+    <published>2019-03-15T12:30:35.000Z</published>
+    <updated>2019-03-15T12:46:17.264Z</updated>
+    
+    <content type="html"><![CDATA[<p>期待了一个月的小英雄剧场版，今天下午去电影院阅毕，流泪走出电影院。</p><p>其实全程内心都有一个声音在干嚎：</p><blockquote><p>欧叔和David俩人的关系是不是有点过于那个了</p><p>欧叔年轻时候也太帅了 我晕</p><p>轰也太苏了吧怎么会有这种人啊</p><p>爆豪和谁一起都好吃</p><p>咔酱带了切切一起出来玩 切爆 is real</p><p>咔酱和轰总也太般配了 兄弟们觉得般配的能把般配打在公屏上吗</p><p>咔酱为什么见到deku就开始生气啊 是不是有点那个</p></blockquote><p>到了最后：<strong>all胜 我真的可以！</strong></p><p>细节太多了以致于现在我语无伦次，虽然剧场版二人交流不多，总结下来内心对于出胜这对还是意难平。前段时间看完第三季的倒数第二集时，我写下了这段话：</p><blockquote><p>语言无法描述这种羁绊。他们热切地想要靠近彼此，想要紧紧拥抱对方，但又只能以互相伤害的方式相处。心里说着“别过来”却又不可遏止地步步紧逼，渴望着平等与交流。但是自尊不允许他这样。两人都说过“明明以前都是你在我身后”，另一方也都曾撕心裂肺地喊出过「返せ」。</p><p>他们绝不可能在一起，绝不会成为正常环境下的友好伙伴，但对于彼此来说永远是最重要的存在。永远无法接近，永远伤痕累累。</p><p>永远爱恨交加。</p></blockquote><p>再联系那篇《漆黑一片》，有时候就觉得人的情感真的太微妙了。现实的情境下人的所有情感往往是处于dilemma中的，进退不得，像是投鼠忌器，或是前有狼后有虎，但也正因此才达到了微妙的平衡，才会让人觉得<strong>“这才是真实的他们啊”</strong>。</p><p>比如出胜，比如佐鸣/鸣佐（这对怎么样我都可以）。</p><p>想到什么以后再加上去，二刷希望。</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;期待了一个月的小英雄剧场版，今天下午去电影院阅毕，流泪走出电影院。&lt;/p&gt;
+&lt;p&gt;其实全程内心都有一个声音在干嚎：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;欧叔和David俩人的关系是不是有点过于那个了&lt;/p&gt;
+&lt;p&gt;欧叔年轻时候也太帅了 我晕&lt;/p&gt;
+&lt;p&gt;轰也太苏了吧怎
+      
+    
+    </summary>
+    
+      <category term="影评" scheme="http://yoursite.com/categories/%E5%BD%B1%E8%AF%84/"/>
+    
+    
+      <category term="我的英雄学院" scheme="http://yoursite.com/tags/%E6%88%91%E7%9A%84%E8%8B%B1%E9%9B%84%E5%AD%A6%E9%99%A2/"/>
+    
+      <category term="爆豪胜己" scheme="http://yoursite.com/tags/%E7%88%86%E8%B1%AA%E8%83%9C%E5%B7%B1/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>《流浪地球》观后感</title>
+    <link href="http://yoursite.com/2019/02/06/%E3%80%8A%E6%B5%81%E6%B5%AA%E5%9C%B0%E7%90%83%E3%80%8B%E8%A7%82%E5%90%8E%E6%84%9F/"/>
+    <id>http://yoursite.com/2019/02/06/《流浪地球》观后感/</id>
+    <published>2019-02-06T12:02:41.000Z</published>
+    <updated>2019-03-14T09:44:14.145Z</updated>
+    
+    <content type="html"><![CDATA[<p>这部电影证明我国电影特效技术早都到位了 只是一直没遇到好作品</p><p>几十年后 严酷的地上环境 人类为了生存躲进避难所 辐射里称为shelter 这里称为地下城 说实话爷爷抱着孙子进入避难所的这幕过场给我留下了很深的印象 简直和辐射4开场时一模一样 而教室外阳光明媚的虚拟布景又让我想起海伯利安的模拟刺激接入 总而言之就是要素过多 而又恰到好处</p><p>我总觉得悲伤和壮烈 这两点中的任何一点 被单独提及时都无法震撼人心 只有当它们以悲壮出现时才是最优解：“虽千万人 吾往矣” 我想不论何时 科幻这一题材终究是载体 它的内核仍是要落到人类的情感之上 所以我才会在看到刘启一人抬头仰望巨大奇异的木星时眼眶湿润 被迫与不可控的宇宙星体相对抗 像极了温伯特教授带着逆时间而行的瑞秋回到海伯利安寻找答案 他们都面临着不可知的命运 企图以一己之力扭转早已落幕的结局 这是悲伤 而当刘启在绝望的气氛中寻找解答与出口 当温伯特跪倒在浑身布满荆棘的伯劳面前时 他们确实发出了有力的声音 为了抓住仅存的微光 这是壮烈</p><p>科学仍然很迷人 它为你描绘出无限大的蓝图 又伴随着深不可测的冷酷与温情 无法预测 无法改变 也无法与之抗衡 </p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;这部电影证明我国电影特效技术早都到位了 只是一直没遇到好作品&lt;/p&gt;
+&lt;p&gt;几十年后 严酷的地上环境 人类为了生存躲进避难所 辐射里称为shelter 这里称为地下城 说实话爷爷抱着孙子进入避难所的这幕过场给我留下了很深的印象 简直和辐射4开场时一模一样 而教室外阳光明媚的
+      
+    
+    </summary>
+    
+      <category term="影评" scheme="http://yoursite.com/categories/%E5%BD%B1%E8%AF%84/"/>
+    
+    
+      <category term="电影" scheme="http://yoursite.com/tags/%E7%94%B5%E5%BD%B1/"/>
+    
+      <category term="流浪地球" scheme="http://yoursite.com/tags/%E6%B5%81%E6%B5%AA%E5%9C%B0%E7%90%83/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>《海伯利安》阅读记录</title>
+    <link href="http://yoursite.com/2019/01/15/%E3%80%8A%E6%B5%B7%E4%BC%AF%E5%88%A9%E5%AE%89%E3%80%8B%E9%98%85%E8%AF%BB%E8%AE%B0%E5%BD%95/"/>
+    <id>http://yoursite.com/2019/01/15/《海伯利安》阅读记录/</id>
+    <published>2019-01-14T17:27:03.000Z</published>
+    <updated>2019-03-14T11:08:55.907Z</updated>
+    
+    <content type="html"><![CDATA[<h2 id="First-story-神父"><a href="#First-story-神父" class="headerlink" title="First story 神父"></a>First story 神父</h2><p>保罗·杜雷神父 </p><p>为了拯救教会编造谎言而被放逐 </p><p>追逐毕库拉 ——海伯利安上的土著人 </p><p>他见到了伯劳</p><p>他最终也成为了十字架的一员</p><p>为了摆脱十字架 他将自己钉在巨树中</p><p>十字架的人无法命享真死</p><p>他在苏醒-痛苦-死亡中轮回了七年</p><p>十字架一遍遍将他唤醒 强迫他承受巨大的痛苦</p><p>“我无论如何也要回去 可他如何……七年啊！”</p><p>霍伊特神父终结了保罗神父的痛苦 使他得到了解脱</p><p>霍伊特神父接替并承载了两个十字架的痛苦</p><h2 id="Second-story-上校"><a href="#Second-story-上校" class="headerlink" title="Second story 上校"></a>Second story 上校</h2><p>卡萨德上校</p><p>在虚拟世界里的神秘女人</p><p>与他一次次相遇 带他逃脱危险</p><p>大哀之君是伯劳</p><p>伯劳为他赋予停止时间的能力</p><p>她逆时间而来 他迎时间而上</p><p>未来的荆棘之树上 至少悬挂着七个人中的某个人</p><h2 id="Third-story-诗人"><a href="#Third-story-诗人" class="headerlink" title="Third story 诗人"></a>Third story 诗人</h2><p>马丁·塞利纳斯</p><p>从旧地而来 由于运气而卖出三十亿的诗集</p><p>人生大起大落</p><p>去往海伯利安</p><p>哀王 比利王</p><p>他的女神是伯劳</p><p>只有伯劳不断杀戮 他的史诗才能继续下去</p><p>最终只剩下他与伯劳存在于此</p><p>伯劳杀死了想要毁掉手稿的比利王 马丁点燃了圣母圣子像</p><p>他的诗集最终没有完成</p><h2 id="Forth-story-学者"><a href="#Forth-story-学者" class="headerlink" title="Forth story 学者"></a>Forth story 学者</h2><p>索尔·温伯特</p><p>看着孩子逆时间而去</p><p>每一个清晨的迷茫与痛苦</p><p>都成为了父母的煎熬</p><p>生命的最初意味着结束</p><p>“从未来回到过去 时光不可追溯”</p><p>誓与伯劳对抗 反抗不可知的命运</p><h2 id="Fifth-story-侦探"><a href="#Fifth-story-侦探" class="headerlink" title="Fifth story 侦探"></a>Fifth story 侦探</h2><p>拉米亚·布劳恩</p><p>深陷于赛博人的目光</p><p>他是约翰·济慈吗</p><p>他是谁</p><p>但他的生命被奉献给了教会</p><p>连同他眼中晶莹剔透的光芒一起</p><p>在主教面前抱着那具本就没有生命的尸体</p><p>海伯利安能给她答案吗</p><h2 id="Sixth-story-领事"><a href="#Sixth-story-领事" class="headerlink" title="Sixth story 领事"></a>Sixth story 领事</h2><p>希莉</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;h2 id=&quot;First-story-神父&quot;&gt;&lt;a href=&quot;#First-story-神父&quot; class=&quot;headerlink&quot; title=&quot;First story 神父&quot;&gt;&lt;/a&gt;First story 神父&lt;/h2&gt;&lt;p&gt;保罗·杜雷神父 &lt;/p&gt;
+&lt;p&gt;为了拯救教会
+      
+    
+    </summary>
+    
+      <category term="书评" scheme="http://yoursite.com/categories/%E4%B9%A6%E8%AF%84/"/>
+    
+    
+      <category term="科幻" scheme="http://yoursite.com/tags/%E7%A7%91%E5%B9%BB/"/>
+    
+      <category term="海伯利安" scheme="http://yoursite.com/tags/%E6%B5%B7%E4%BC%AF%E5%88%A9%E5%AE%89/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>《茶花女》与《荆棘鸟》</title>
+    <link href="http://yoursite.com/2018/03/13/%E3%80%8A%E8%8C%B6%E8%8A%B1%E5%A5%B3%E3%80%8B%E4%B8%8E%E3%80%8A%E8%8D%86%E6%A3%98%E9%B8%9F%E3%80%8B/"/>
+    <id>http://yoursite.com/2018/03/13/《茶花女》与《荆棘鸟》/</id>
+    <published>2018-03-13T13:05:46.000Z</published>
+    <updated>2019-03-14T11:19:44.840Z</updated>
+    
+    <content type="html"><![CDATA[<p>今晚实在不想写程序作业，就把《茶花女》剩下的几章看完了。还是爱情。最近看的几本书都是这样的结局，都是那种”他们的结局最好还能如何呢？”。梅吉和拉尔夫是这样，他们一生相见的机会无几，“他们还能怎样呢？”，说破天也就是最后男子能死在心爱的女子怀中。玛格丽特和阿尔芒也一样。她要为她过去的放荡生活付出代价，这注定了无论怎样的改过自新也换不来她今后的幸福。天道轮回。</p><p><strong>“有些人在心灵的孤寂中，在病房的幽暗中，昨天还希望快些死去，今天看到别人生活和幸福，怎么又渴望活下去了呢？“</strong></p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;今晚实在不想写程序作业，就把《茶花女》剩下的几章看完了。还是爱情。最近看的几本书都是这样的结局，都是那种”他们的结局最好还能如何呢？”。梅吉和拉尔夫是这样，他们一生相见的机会无几，“他们还能怎样呢？”，说破天也就是最后男子能死在心爱的女子怀中。玛格丽特和阿尔芒也一样。她要为
+      
+    
+    </summary>
+    
+      <category term="书评" scheme="http://yoursite.com/categories/%E4%B9%A6%E8%AF%84/"/>
+    
+    
+      <category term="茶花女" scheme="http://yoursite.com/tags/%E8%8C%B6%E8%8A%B1%E5%A5%B3/"/>
+    
+      <category term="荆棘鸟" scheme="http://yoursite.com/tags/%E8%8D%86%E6%A3%98%E9%B8%9F/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>关于爱与偏爱</title>
+    <link href="http://yoursite.com/2018/03/05/%E5%85%B3%E4%BA%8E%E7%88%B1%E4%B8%8E%E5%81%8F%E7%88%B1/"/>
+    <id>http://yoursite.com/2018/03/05/关于爱与偏爱/</id>
+    <published>2018-03-05T12:36:25.000Z</published>
+    <updated>2019-03-14T16:11:38.259Z</updated>
+    
+    <content type="html"><![CDATA[<p>开学第二周的周一下午，两节E类课，把《荆棘鸟》最后的五十来页看完了。可能是因为坐在几十个人之间看完了结局，结局没让我哭。但是吃饭的时候在豆瓣上看到这段话还是没忍住：</p><blockquote><p>“三十七年，拉尔夫和梅吉只有五次相见：1932年，梅吉的父亲和哥哥斯图尔特在德罗海达的大火中死去，拉尔夫在泥泞之中艰难跋涉，狂奔而来；1937年，梅吉将要生下卢克的女儿朱丝婷，拉尔夫在床前握住她的手；1938年，拉尔夫与梅吉在麦特劳克岛，跨越了身为一名教士最后的底线；1952年，拉尔夫受封红衣主教，回到德罗海达，见到14岁的戴恩，却不知那正是他和梅吉的儿子；1965年，戴恩死了，得知真相的拉尔夫悲痛欲绝，亲自为戴恩做完追思弥撒之后，死在梅吉怀中，长眠在德罗海达。”</p></blockquote><p>我在想，从这本书进入主线剧情之后，支撑我继续看下去的就是梅吉和拉尔夫这两人的情感了。其实心里也清楚，拉尔夫不会放弃自己的信仰与事业，但还是有所奢望，想着深沉的情感会产生奇迹。可是没有什么奇迹。对两人的结局不满意，可是也想不到在这种关系下什么样的结果才能让所有人都称心。梅吉在11岁时便已经沉浸在拉尔夫的宠溺中了，在那个盛大的集会上，拉尔夫抱着她，踏过水坑，却故意丢下那个美丽而会骑马的姑娘去提着笨重的裙子趟过脏水。这就已经足够令人动容了，我们想要的不仅仅是爱，如果是偏爱才更好。小小的梅吉那时就已经知道自己对于拉尔夫是与其他女孩子不同的，被自己热爱崇敬的人所偏爱，多么令人快乐的事啊。</p><p>所以他们算是幸运了。感受过双方深沉的爱：梅吉在拉尔夫的万般疼爱中长大，而拉尔夫知道了梅吉处在分娩的痛苦中时，口中喊着自己的名字。而且在那个与世隔绝的小岛上，他们有了孩子。想想也就够了，即使他们最终没有结婚，她最终也不是梅吉·布里克萨特。</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;开学第二周的周一下午，两节E类课，把《荆棘鸟》最后的五十来页看完了。可能是因为坐在几十个人之间看完了结局，结局没让我哭。但是吃饭的时候在豆瓣上看到这段话还是没忍住：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;“三十七年，拉尔夫和梅吉只有五次相见：1932年，梅吉的父亲和哥哥斯
+      
+    
+    </summary>
+    
+      <category term="书评" scheme="http://yoursite.com/categories/%E4%B9%A6%E8%AF%84/"/>
+    
+    
+      <category term="荆棘鸟" scheme="http://yoursite.com/tags/%E8%8D%86%E6%A3%98%E9%B8%9F/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>“我的天空里没有太阳”</title>
+    <link href="http://yoursite.com/2016/11/25/%E2%80%9C%E6%88%91%E7%9A%84%E5%A4%A9%E7%A9%BA%E9%87%8C%E6%B2%A1%E6%9C%89%E5%A4%AA%E9%98%B3%E2%80%9D/"/>
+    <id>http://yoursite.com/2016/11/25/“我的天空里没有太阳”/</id>
+    <published>2016-11-24T16:16:40.000Z</published>
+    <updated>2019-03-14T11:30:53.273Z</updated>
+    
+    <content type="html"><![CDATA[<p>下午三节线代听的脑子昏昏沉沉的，下了课决定去买两天没吃的面包和饼干，然后去软件楼把《白夜行》剩下的两章看完。</p><p>大概看到六点多吧，吃着饼干看完的。太突兀了，我甚至不敢相信自己看到了封底的书籍信息。亮司毅然决然地跳下去了，雪穗转身离开，“保持了最大程度的克制”，是这样吧？</p><blockquote><p>“亮司为了雪穗一辈子没有出错，最后雪穗怎么能出错呢？”</p></blockquote><p>下午看到这句话就觉得心里很难受，现在深夜坐在电脑前，还是没能忍住眼泪。不论两人做了多少的恶事，但实际上从一开始，他们就是坏蛋大人的牺牲品。雪穗被亲生母亲卖给了恋童癖老板，而亮司作为雪穗最亲密的朋友，目睹了丑恶的一幕。从他弑父的那一刻开始，两人就注定了要一直互利共生下去。</p><p>在看书的过程中，我试图去想象并构建背后的故事。两人于何时邂逅，于何时确定心意，于何时变得密不可分……他们在书中甚至没有一句对话。可我想对双方来说，两人在一起的时候都是最放松的时刻，不需要再提防可能来自外界的猜测或恶意。两人因“恶”而被连结一起，亮司说自己<strong>“在白夜中行走”</strong>，雪穗说<strong>“我的天空里没有太阳”“因为有东西代替了太阳”“我从来就没有太阳，所以不怕失去。”</strong></p><p>其实我一直很讨厌自己长久而持续地处于和另一个唯一的人相互依赖的立场上，比如来到新环境后立刻去搜寻一个能和自己一起吃饭一起占座位一起去参加活动的女生，也许是因为心里总存有芥蒂，连吃饭也要刻意地避开同学，能少说一句便少说一句。因为处于两人小组中总让我有莫名无力的感觉，知道自己是个不可依靠的人，也很难放下心来去完全地依靠别人。我不知亮司和雪穗在杀死桐原老板后会不会有这样的感觉，可最终他们能够完全地依靠对方。亮司能为雪穗处理一切麻烦事，从初中时散布负面谣言的女同学，到二婚后敏感而抵触的继女，十九年，从始至终，两人都行走在白夜中。亮司的人生没有白天，雪穗的天空没有太阳，那么他便是她的太阳，她是他白色的影子。他们是只为对方开启的光源，是光，是雪。</p><p>我还是讨厌两个人的组合，不论是谁，是怎样的人。因为，一旦有一个人离开，这样的组合不就消失了吗？那么，对于剩下的那只鸳鸯，不论雌雄，不是太过残忍了吗？现在想来，雪穗并不是克制，她的动摇已经外化了。若要装作不认识，只应表现出惊讶恐惧即可，但她转身离开，留下白色的影子。我讨厌这种失去最后的依靠的感觉。就像军训的那天早上，就已经有不好的预感。我还记得自己当时是怎么想的，“最后一根稻草也失去了”。那么，像刘书宇说的那样，让人变得很想跳湖。</p><p>他们利用过很多人，也害死了很多人，这毋庸置疑。而同时，加害者在最初也是受害者。所以这是一个以怨报怨的故事，并不高尚。</p><p>只是我一开始没想到雪穗对继女美佳说的话，竟然是真的。</p><p>我不想为作恶者辩护，人类社会发展至此，恶是找不到根源的。而二人也只是选择用自己曾经被世界对待的方式报复这个世界而已。理性方面，儿童时期埋下恶的种子，这种子必会开出有毒的花，结出有毒的果。感性方面，在白夜中互相照明的二人，在黑暗中扶持前行的二人，足以令人动容。但更让我坚信二人组是不可靠的。</p><p>很多女生都习惯性地觉得爱情比友情更重要，而他们二人的情感甚至比爱情更牢固——依赖。我只能想到这个词，是能为了对方毁掉或获得一切的勇气，是能放心向后坠落也不怕着地的信任。</p><p>总结，是个悲剧，但雪穗在最后也没有做错，至少她有过这样的经历，有过这样幸福的日子，有过彼此。</p><p>2016.11.25</p><p>0:16</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;下午三节线代听的脑子昏昏沉沉的，下了课决定去买两天没吃的面包和饼干，然后去软件楼把《白夜行》剩下的两章看完。&lt;/p&gt;
+&lt;p&gt;大概看到六点多吧，吃着饼干看完的。太突兀了，我甚至不敢相信自己看到了封底的书籍信息。亮司毅然决然地跳下去了，雪穗转身离开，“保持了最大程度的克制”，是
+      
+    
+    </summary>
+    
+      <category term="书评" scheme="http://yoursite.com/categories/%E4%B9%A6%E8%AF%84/"/>
+    
+    
+      <category term="白夜行" scheme="http://yoursite.com/tags/%E7%99%BD%E5%A4%9C%E8%A1%8C/"/>
+    
+  </entry>
+  
+</feed>

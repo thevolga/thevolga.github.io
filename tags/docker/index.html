@@ -65,6 +65,12 @@
                 </a>
             
         
+            
+                <a href="/atom.xml">
+                    <img src="/assets/RSS.svg">
+                </a>
+            
+        
     </section>
 </aside>
 
@@ -76,6 +82,146 @@
         <h1>{ docker }</h1>
     </header>
   
+  
+    <li>
+      <article class="ListView">
+    <header class="title">
+      
+        <h1>
+          <a href="/2019/03/21/关于在Cassandra中使用cqlsh的一晚上折腾记录/">关于在Cassandra中使用cqlsh的一晚上折腾记录</a>
+        </h1>
+      
+      <div class="ListMeta">
+  <time datetime="2019-03-21T15:42:19.000Z" itemprop="datePublished">
+    2019-03-21
+  </time>
+  
+  | 
+  <ul>
+    
+  <li class="meta-text">
+  { <a href="/tags/docker/">docker</a> }
+  </li>
+
+
+  </ul>
+  
+  
+  / 
+  <ul>
+    
+  <li class="meta-text">
+  { <a href="/categories/技术/">技术</a> }
+  </li>
+
+
+  </ul>
+  
+</div>
+
+    </header>
+    <div>
+      
+        <p>虽然这周六要考GRE，但是该做的还是得做，该学的还是得学。今天是Cassandra+cqlsh的学习记录。</p>
+<h4 id="CQL特性"><a href="#CQL特性" class="headerlink" title="CQL特性"></a>CQL特性</h4><p>No arbitrary WHERE clause</p>
+<p>No JOINS</p>
+<p>No arbitrary GROUP BY</p>
+<p>No arbitrary ORDER BY clauses</p>
+<h4 id="创建-create"><a href="#创建-create" class="headerlink" title="创建 create"></a>创建 create</h4><p>创建名为animals的keyspace后，可以用desc keyspaces查看。</p>
+<p>之后创建monkeys的表。</p>
+<blockquote>
+<p>CREATE TABLE monkeys (  </p>
+<p>​    type text,  </p>
+<p>​    family text,  </p>
+<p>​    common_name text,  </p>
+<p>​    conservation_status text,  </p>
+<p>​    avg_size_in_grams int,  </p>
+<p>​    PRIMARY KEY ((type, family), common_name));</p>
+<p>);</p>
+</blockquote>
+<p>注意此处的primary key。此处为一个复合键。前一个(type, family)为partition key，后一个common_name为cluster key。</p>
+<h4 id="composite-partition-key"><a href="#composite-partition-key" class="headerlink" title="composite partition key"></a>composite partition key</h4><p>由多列组成，在cluster columns之前由一组额外的括号定义。</p>
+<p>既然cluster key决定了数据在一行中存储的顺序 那么partition key就帮助将数据分散在cluster中。</p>
+<p>设计表时，可将partition key视为将数据平均地传播到cluster中的工具。可将cluster key视为决定一个partition中数据顺序的事物。</p>
+<p>*cluster key是可选的。</p>
+<h4 id="插入-insert"><a href="#插入-insert" class="headerlink" title="插入 insert"></a>插入 insert</h4><p>当插入数据时，主键是必需的（mandatory）。</p>
+<p>命令语句同MySQL数据库。</p>
+<p>之后用select语句查看数据，红色属性为partition key，蓝绿色（cyan）属性为cluster key。</p>
+<h4 id="一致性等级-consistency-level"><a href="#一致性等级-consistency-level" class="headerlink" title="一致性等级 consistency level"></a>一致性等级 consistency level</h4><p>此属性可以配置。 </p>
+<p>Cassandra作为NoSQL数据库在CAP原理上选择了AP，即availability和partition tolerance（未选择C which means consistency）。</p>
+<p>输入 consistency cql中出现表述：</p>
+<blockquote>
+<p>cqlsh:animals&gt; consistency<br>Current consistency level is ONE.</p>
+</blockquote>
+<p>解释：一致性等级为1，表示只要一个node成功插入了这个statement，则认为插入成功。在每一个节点上，该insert statement首先被写入commit log，之后再被插入memtable（如一个write back cache）。这个memtable会被周期性或是在达到某个</p>
+<p>bu’guo阈值时被冲入disk中。这个flushing的过程将memtable/cache转化为一个SSTable。</p>
+<h4 id="节点工具-flush"><a href="#节点工具-flush" class="headerlink" title="节点工具 flush"></a>节点工具 flush</h4><p>手动将animals flush进入disk以创建SSTable</p>
+<blockquote>
+<p>nodetool flush animals</p>
+</blockquote>
+<p>之后可在docker根文件夹找到SSTable</p>
+<p>本步骤失败。今晚一直在解决docker内安装cassandra之后找不到json文件目录的问题。</p>
+<p>然后现在在apple官网看mac的售价。</p>
+<p><strong>2h后：</strong></p>
+<p>纠结了几个小时，内网外网相关网站都看完了。最终决定先忽略了这一步，安装了Cassandra-driver之后，运行了如下程序，算是初步把数据库和python程序接上头了，还可以吧。</p>
+<p>之前先rm原来的容器，重新执行下列有端口的命令：</p>
+<blockquote>
+<p>docker run –name thevolga -p 9042:9042 -d cassandra:latest</p>
+</blockquote>
+<p>之后执行docker ps可以看到目前正在运行的docker:</p>
+<blockquote>
+<p>C:\WINDOWS\system32&gt;docker ps<br>CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                                                       NAMES<br>1ec3049bc07f        cassandra:latest    “docker-entrypoint.s…”   6 minutes ago       Up 6 minutes        7000-7001/tcp, 7199/tcp, 9160/tcp, <strong>0.0.0.0:9042-&gt;9042/tcp</strong>   thevolga</p>
+</blockquote>
+<p>黑体部分说明有了端口映射。</p>
+<p>之后运行如下python程序即可，注意indent。</p>
+<blockquote>
+<p>import logging</p>
+<p>log = logging.getLogger()</p>
+<p>log.setLevel(‘INFO’)</p>
+<p>handler = logging.StreamHandler()</p>
+<p>handler.setFormatter(logging.Formatter(“%(asctime)s [%(levelname)s] %(name)s: %(message)s”))</p>
+<p>log.addHandler(handler)</p>
+<p>from cassandra.cluster import Cluster</p>
+<p>from cassandra import ConsistencyLevel</p>
+<p># from cassandra.cluster import Cluster</p>
+<p># from cassandra.query import SimpleStatement</p>
+<p>KEYSPACE = “mykeyspace”</p>
+<p>def createKeySpace():</p>
+<p>   cluster = Cluster(contact_points=[‘127.0.0.1’],port=9042)</p>
+<p>   session = cluster.connect()</p>
+<p>   log.info(“Creating keyspace…”)</p>
+<p>   try:</p>
+<p>​       session.execute(“””</p>
+<p>​           CREATE KEYSPACE %s</p>
+<p>​           WITH replication = { ‘class’: ‘SimpleStrategy’, ‘replication_factor’: ‘2’ }</p>
+<p>​           “”” % KEYSPACE)</p>
+<p>​       log.info(“setting keyspace…”)</p>
+<p>​       session.set_keyspace(KEYSPACE)</p>
+<p>​       log.info(“creating table…”)</p>
+<p>​       session.execute(“””</p>
+<p>​           CREATE TABLE mytable (</p>
+<p>​               mykey text,</p>
+<p>​               col1 text,</p>
+<p>​               col2 text,</p>
+<p>​               PRIMARY KEY (mykey, col1)</p>
+<p>​           )</p>
+<p>​           “””)</p>
+<p>   except Exception as e:</p>
+<p>​       log.error(“Unable to create keyspace”)</p>
+<p>​       log.error(e)</p>
+<p>createKeySpace();</p>
+</blockquote>
+<p>初次运行本段代码后，控制台输入以下信息 which implys 连接成功。</p>
+<blockquote>
+<p>(base) G:\flasklab&gt;cd g:\flasklab &amp;&amp; cmd /C “set “PYTHONIOENCODING=UTF-8” &amp;&amp; set “PYTHONUNBUFFERED=1” &amp;&amp; G:\Anaconda3\python.exe c:\Users\lenovo.vscode\extensions\ms-python.python-2019.1.0\pythonFiles\ptvsd_launcher.py –default –client –host localhost –port 54305 g:\flasklab\test.py “<br>2019-03-21 23:30:05,235 [WARNING] cassandra.cluster: Cluster.<strong>init</strong> called with contact_points specified, but no load_balancing_policy. In the next major version, this will raise an error; please specify a load-balancing policy. (contact_points = [‘127.0.0.1’], lbp = None)<br>2019-03-21 23:30:06,963 [INFO] cassandra.policies: Using datacenter ‘datacenter1’ for DCAwareRoundRobinPolicy (via host ‘127.0.0.1’); if incorrect, please specify a local_dc to the constructor, or limit contact points to local cluster nodes<br>2019-03-21 23:30:07,283 [INFO] root: Creating keyspace…<br>2019-03-21 23:30:08,710 [INFO] root: setting keyspace…<br>2019-03-21 23:30:08,848 [INFO] root: creating table…</p>
+</blockquote>
+<p>今天就到这里吧，毕竟快要考试了，而我甚至现在还想给blog加一个RSS订阅的接口。你可当个人吧。</p>
+
+      
+    </div>
+</article>
+
+    </li>
   
     <li>
       <article class="ListView">
