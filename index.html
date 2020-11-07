@@ -84,6 +84,54 @@
     <header class="title">
       
         <h1>
+          <a href="/2020/11/07/记一次痛心疾首的debug经历/">记一次痛心疾首的debug经历</a>
+        </h1>
+      
+      <div class="ListMeta">
+  <time datetime="2020-11-07T08:00:38.000Z" itemprop="datePublished">
+    2020-11-07
+  </time>
+  
+  | 
+  <ul>
+    
+  <li class="meta-text">
+  { <a href="/tags/技术/">技术</a> }
+  </li>
+
+
+  </ul>
+  
+  
+</div>
+
+    </header>
+    <div>
+      
+        <p>上周的时候项目根据设计师的稿子重新改了ui，我也随之重新重构了几个vue界面的格式。QandA文件内，讨论区在发布评论的时候会通过load函数直接重新get评论刷新组件，所以在发布之后会直接显示最新的评论并且其他父组件的数据不变，而删除函数中虽然也写入了load，但是不起作用，我猜测是由于缓存或者其他原因，删除操作与简单地添加不同，总是不会显示删除的结果。之前的解决方案是，把QandA写在一个单独的界面，然后每逢删除操作则刷新，虽然速度感人但是至少是解决了问题的。但是代码结构重构了之后，每次用location.reload()强制刷新的时候，由于我的讨论区组件是通过CoursePage.vue文件内的showQA属性标识的，每次子组件内的刷新实际上刷新的是整个父组件，也因此showQA在刷新后会被重新置为false，这就意味着页面也会重新回到CoursePage.vue初始的课程界面。</p>
+<p>于是目前的矛盾是，如果不刷新那么就没法展示删除功能，如果刷新了那么就会跳回父组件的页面。于是本懒狗选择了强制刷新，至少先实现了功能再说，然后等到测试那边测出来bug再说吧，哈哈。</p>
+<p>↑ 以上是上周的情况。</p>
+<p>一周无话，然后到了周五晚上测试突然找我开线上会，说测出了好几个bug。其他的都好说，昨晚基本都自己改了/和其他人协调着改了。这个删除的bug当然也被测出来了。我：“额，这个可能我得再想想，或者问问其他人。”属于是噶住了。</p>
+<p>其实之前想到的一个比较高大上的解决方案是，通过props利用子组件向父组件传值。当时初步的想法是，父组件在调用QandA组件的时候，传一个needRef（初始值为false）过去，和courseid什么的同理，然后子组件就可以通过props获取一个needRef属性（此时的值还是false），每当子组件中有删除操作，就把needRef置为true，而子组件中的watch侦听属性会监听到子组件中needRef值的变化，从而触发如下变化：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">watch: &#123;</span><br><span class="line">  needRef: <span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="keyword">this</span>.needRef) &#123;</span><br><span class="line">      <span class="keyword">this</span>.$emit(<span class="string">'ref-ok'</span>, <span class="literal">true</span>)</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">this</span>.$emit(<span class="string">'ref-ok'</span>, <span class="literal">false</span>)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>而emit函数，第一个引号内是父组件绑定在子组件上的函数名，后一个是这个函数从子组件将要传入的值。这个watch属性内主要实现的功能就是，当needRef值在子组件内发生变化的时候，进入watch部分，如果delete执行，则needRef为true，这个true会传到父组件中的这个部分</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 父组件调用子组件</span></span><br><span class="line">&lt;QandA </span><br><span class="line">:courseid=<span class="string">'courseData.id'</span> </span><br><span class="line">:need-ref=<span class="string">"needRef"</span> </span><br><span class="line">@ref-ok=<span class="string">"refOK"</span></span><br><span class="line">&gt;&lt;/QandA&gt;</span><br></pre></td></tr></table></figure>
+<p>也就是说，子组件内的ref-ok就是父组件内的refOK函数</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 父组件内</span></span><br><span class="line">refOK (result) &#123;</span><br><span class="line">  <span class="keyword">if</span> (result) &#123;</span><br><span class="line">    <span class="keyword">this</span>.needRef = <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>而当子组件在删除后将needRef变为true后，父组件中的needRef又通过refOK将needRef变为false。于是这个值又会通过props传给子组件，从而两个组件又回到初始状态，等待下一次删除操作对组件进行同样的刷新。</p>
+<p>（还是不知道我写的对不对，明天和其他人讨论一下吧。我真的服了，改好了之后又看不懂了，纯纯的胎神。）</p>
+
+      
+    </div>
+</article>
+
+    </li>
+  
+    <li>
+      <article class="ListView">
+    <header class="title">
+      
+        <h1>
           <a href="/2020/09/15/200915《我的二本学生》读后随感/">200915《我的二本学生》读后随感</a>
         </h1>
       
@@ -833,59 +881,13 @@
 
     </li>
   
-    <li>
-      <article class="ListView">
-    <header class="title">
-      
-        <h1>
-          <a href="/2018/03/05/关于爱与偏爱/">关于爱与偏爱</a>
-        </h1>
-      
-      <div class="ListMeta">
-  <time datetime="2018-03-05T12:36:25.000Z" itemprop="datePublished">
-    2018-03-05
-  </time>
-  
-  | 
-  <ul>
-    
-  <li class="meta-text">
-  { <a href="/tags/荆棘鸟/">荆棘鸟</a> }
-  </li>
-
-
-  </ul>
-  
-  
-  / 
-  <ul>
-    
-  <li class="meta-text">
-  { <a href="/categories/书评/">书评</a> }
-  </li>
-
-
-  </ul>
-  
-</div>
-
-    </header>
-    <div>
-      
-        <p>开学第二周的周一下午，两节E类课，把《荆棘鸟》最后的五十来页看完了。可能是因为坐在几十个人之间看完了结局，结局没让我哭。但是吃饭的时候在豆瓣上看到这段话还是没忍住：</p>
-<blockquote>
-<p>“三十七年，拉尔夫和梅吉只有五次相见：1932年，梅吉的父亲和哥哥斯图尔特在德罗海达的大火中死去，拉尔夫在泥泞之中艰难跋涉，狂奔而来；1937年，梅吉将要生下卢克的女儿朱丝婷，拉尔夫在床前握住她的手；1938年，拉尔夫与梅吉在麦特劳克岛，跨越了身为一名教士最后的底线；1952年，拉尔夫受封红衣主教，回到德罗海达，见到14岁的戴恩，却不知那正是他和梅吉的儿子；1965年，戴恩死了，得知真相的拉尔夫悲痛欲绝，亲自为戴恩做完追思弥撒之后，死在梅吉怀中，长眠在德罗海达。”</p>
-</blockquote>
-<p>我在想，从这本书进入主线剧情之后，支撑我继续看下去的就是梅吉和拉尔夫这两人的情感了。其实心里也清楚，拉尔夫不会放弃自己的信仰与事业，但还是有所奢望，想着深沉的情感会产生奇迹。可是没有什么奇迹。对两人的结局不满意，可是也想不到在这种关系下什么样的结果才能让所有人都称心。梅吉在11岁时便已经沉浸在拉尔夫的宠溺中了，在那个盛大的集会上，拉尔夫抱着她，踏过水坑，却故意丢下那个美丽而会骑马的姑娘去提着笨重的裙子趟过脏水。这就已经足够令人动容了，我们想要的不仅仅是爱，如果是偏爱才更好。小小的梅吉那时就已经知道自己对于拉尔夫是与其他女孩子不同的，被自己热爱崇敬的人所偏爱，多么令人快乐的事啊。</p>
-<p>所以他们算是幸运了。感受过双方深沉的爱：梅吉在拉尔夫的万般疼爱中长大，而拉尔夫知道了梅吉处在分娩的痛苦中时，口中喊着自己的名字。而且在那个与世隔绝的小岛上，他们有了孩子。想想也就够了，即使他们最终没有结婚，她最终也不是梅吉·布里克萨特。</p>
-
-      
-    </div>
-</article>
-
-    </li>
-  
 </ul>
+
+  <section id="nav-wrapper">
+    <nav id="page-nav">
+      <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="extend next" rel="next" href="/page/2/">next »</a>
+    </nav>
+  </section>
 
 
             <footer>

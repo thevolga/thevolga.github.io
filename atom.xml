@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://thevolga.github.io/"/>
-  <updated>2020-09-15T13:53:36.341Z</updated>
+  <updated>2020-11-07T08:54:55.939Z</updated>
   <id>http://thevolga.github.io/</id>
   
   <author>
@@ -15,6 +15,29 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>记一次痛心疾首的debug经历</title>
+    <link href="http://thevolga.github.io/2020/11/07/%E8%AE%B0%E4%B8%80%E6%AC%A1%E7%97%9B%E5%BF%83%E7%96%BE%E9%A6%96%E7%9A%84debug%E7%BB%8F%E5%8E%86/"/>
+    <id>http://thevolga.github.io/2020/11/07/记一次痛心疾首的debug经历/</id>
+    <published>2020-11-07T08:00:38.000Z</published>
+    <updated>2020-11-07T08:54:55.939Z</updated>
+    
+    <content type="html"><![CDATA[<p>上周的时候项目根据设计师的稿子重新改了ui，我也随之重新重构了几个vue界面的格式。QandA文件内，讨论区在发布评论的时候会通过load函数直接重新get评论刷新组件，所以在发布之后会直接显示最新的评论并且其他父组件的数据不变，而删除函数中虽然也写入了load，但是不起作用，我猜测是由于缓存或者其他原因，删除操作与简单地添加不同，总是不会显示删除的结果。之前的解决方案是，把QandA写在一个单独的界面，然后每逢删除操作则刷新，虽然速度感人但是至少是解决了问题的。但是代码结构重构了之后，每次用location.reload()强制刷新的时候，由于我的讨论区组件是通过CoursePage.vue文件内的showQA属性标识的，每次子组件内的刷新实际上刷新的是整个父组件，也因此showQA在刷新后会被重新置为false，这就意味着页面也会重新回到CoursePage.vue初始的课程界面。</p><p>于是目前的矛盾是，如果不刷新那么就没法展示删除功能，如果刷新了那么就会跳回父组件的页面。于是本懒狗选择了强制刷新，至少先实现了功能再说，然后等到测试那边测出来bug再说吧，哈哈。</p><p>↑ 以上是上周的情况。</p><p>一周无话，然后到了周五晚上测试突然找我开线上会，说测出了好几个bug。其他的都好说，昨晚基本都自己改了/和其他人协调着改了。这个删除的bug当然也被测出来了。我：“额，这个可能我得再想想，或者问问其他人。”属于是噶住了。</p><p>其实之前想到的一个比较高大上的解决方案是，通过props利用子组件向父组件传值。当时初步的想法是，父组件在调用QandA组件的时候，传一个needRef（初始值为false）过去，和courseid什么的同理，然后子组件就可以通过props获取一个needRef属性（此时的值还是false），每当子组件中有删除操作，就把needRef置为true，而子组件中的watch侦听属性会监听到子组件中needRef值的变化，从而触发如下变化：</p><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">watch: &#123;</span><br><span class="line">  needRef: <span class="function"><span class="keyword">function</span> (<span class="params"></span>) </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (<span class="keyword">this</span>.needRef) &#123;</span><br><span class="line">      <span class="keyword">this</span>.$emit(<span class="string">'ref-ok'</span>, <span class="literal">true</span>)</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">      <span class="keyword">this</span>.$emit(<span class="string">'ref-ok'</span>, <span class="literal">false</span>)</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>而emit函数，第一个引号内是父组件绑定在子组件上的函数名，后一个是这个函数从子组件将要传入的值。这个watch属性内主要实现的功能就是，当needRef值在子组件内发生变化的时候，进入watch部分，如果delete执行，则needRef为true，这个true会传到父组件中的这个部分</p><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 父组件调用子组件</span></span><br><span class="line">&lt;QandA </span><br><span class="line">:courseid=<span class="string">'courseData.id'</span> </span><br><span class="line">:need-ref=<span class="string">"needRef"</span> </span><br><span class="line">@ref-ok=<span class="string">"refOK"</span></span><br><span class="line">&gt;&lt;/QandA&gt;</span><br></pre></td></tr></table></figure><p>也就是说，子组件内的ref-ok就是父组件内的refOK函数</p><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 父组件内</span></span><br><span class="line">refOK (result) &#123;</span><br><span class="line">  <span class="keyword">if</span> (result) &#123;</span><br><span class="line">    <span class="keyword">this</span>.needRef = <span class="literal">false</span></span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure><p>而当子组件在删除后将needRef变为true后，父组件中的needRef又通过refOK将needRef变为false。于是这个值又会通过props传给子组件，从而两个组件又回到初始状态，等待下一次删除操作对组件进行同样的刷新。</p><p>（还是不知道我写的对不对，明天和其他人讨论一下吧。我真的服了，改好了之后又看不懂了，纯纯的胎神。）</p>]]></content>
+    
+    <summary type="html">
+    
+      
+      
+        &lt;p&gt;上周的时候项目根据设计师的稿子重新改了ui，我也随之重新重构了几个vue界面的格式。QandA文件内，讨论区在发布评论的时候会通过load函数直接重新get评论刷新组件，所以在发布之后会直接显示最新的评论并且其他父组件的数据不变，而删除函数中虽然也写入了load，但是不起作
+      
+    
+    </summary>
+    
+    
+      <category term="技术" scheme="http://thevolga.github.io/tags/%E6%8A%80%E6%9C%AF/"/>
+    
+  </entry>
   
   <entry>
     <title>200915《我的二本学生》读后随感</title>
